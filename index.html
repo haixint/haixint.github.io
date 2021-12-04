@@ -1,0 +1,878 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <title>Project 2</title>
+    <script src="https://d3js.org/d3.v7.min.js"></script>
+    <script src="https://unpkg.com/d3-simple-slider"></script>
+    <script src="https://d3js.org/topojson.v3.min.js"></script>
+</head>
+
+<body>
+    <h2 style="font-family:Georgia, serif; color:rgb(56, 48, 48)">
+        Global Temperatures Over 270 Years (1743 - 2013)
+    </h2>
+    <hr />
+    <div>
+        <p id="value-time"
+            style="font-size:20px; font-weight: 600; color:rgb(58, 57, 57); font-family: Georgia, serif;"></p>
+    </div>
+    <div style="width:60%; height:80vh; float:left; display: inline; margin-top:-70px; font-family: Georgia, serif;">
+        <svg id="map" height=900 width=800></svg>
+    </div>
+    <div id="p2"
+        style="width:40%; height:40vh; float:right; display: inline; margin-top:-60px; font-family: Georgia, serif;">
+        <svg id="chart2" height=300 width=550 style="margin-top:80px; margin-left:20px"></svg>
+    </div>
+    <div id="p3"
+        style="width:40%; height:80vh; float:right; display: inline; margin-top: 10px; font-family: Georgia, serif;">
+        <svg id="chart3" height=300 width=550 style="margin-top:120px; margin-left:40px"></svg>
+    </div>
+
+    <svg id="colorLegend" height="100" width="600" style="background: #fff; margin-top:10vh; margin-left:100px"></svg>
+
+    <div id="pulldown-bar" style=" position: absolute; display: inline; margin-top: -250px; margin-left:500px">
+        <select id="sort-select" style="width:200px;">
+            <option value="Argentina" selected>Argentina</option>
+            <option value="Australia">Australia</option>
+            <option value="Bahamas">Bahamas</option>
+            <option value="Brazil">Brazil</option>
+            <option value="Canada">Canada</option>
+            <option value="China">China</option>
+            <option value="Cuba">Cuba</option>
+            <option value="Finland">Finland</option>
+            <option value="France">France</option>
+            <option value="Germany">Germany</option>
+            <option value="Greenland">Greenland</option>
+            <option value="Iceland">Iceland</option>
+            <option value="India">India</option>
+            <option value="Italy">Italy</option>
+            <option value="Malaysia">Malaysia</option>
+            <option value="Netherlands">Netherlands</option>
+            <option value="New Zealand">New Zealand</option>
+            <option value="Norway">Norway</option>
+            <option value="Poland">Poland</option>
+            <option value="Romania">Romania</option>
+            <option value="Singapore">Singapore</option>
+            <option value="South Africa">South Africa</option>
+            <option value="South Korea">South Korea</option>
+            <option value="Switzerland">Switzerland</option>
+            <option value="Thailand">Thailand</option>
+            <option value="Turkey">Turkey</option>
+            <option value="United Kingdom">United Kingdom</option>
+            <option value="United States">United States</option>
+            <option value="Vietnam">Vietnam</option>
+            <option value="Zambia">Zambia</option>
+        </select>
+    </div>
+
+    <div >
+        <p class="describe1"> The map chart aims to reveal the temperature of each country over the world from year 1743 to 2013, colored accordingly from dark blue to dark red.
+            When hovering on each country, an information box will appear on the upper left corner of the chart to reveal the country name and its average temperature
+            in selected year.
+        </p>
+
+        <p class="describe2"> The bar chart above aims to provide a general overview for users to know the land average/maximum/minimum temperature, as well as the land and ocean average temperature
+            in the selected year. When hovering on each bar, a precise value of the temperature will appear on the top.
+            <br/>
+            <br/>
+            The line chart below enables users to select different countries from the picker and see the trend of temperature over the months in the chosen year.
+            Viewers can also drag the slider and compare the difference of the country's temperature trends between differnt years.
+        </p>
+    </div>
+
+    <script>
+        const svg = d3.select("#map");
+
+        const width = svg.attr("width");
+        const height = svg.attr("height");
+        const margin = { top: 50, right: 50, bottom: 20, left: 20 };
+        const mapWidth = width - margin.left - margin.right;
+        const mapHeight = height - margin.top - margin.bottom;
+        const map = svg.append('g').attr('transform', `translate(${margin.left},${margin.top})`);
+
+        const svg2 = d3.select("#chart2");
+
+        const width2 = svg2.attr("width");
+        const height2 = svg2.attr("height");
+        const margin2 = { top: 20, right: 50, bottom: 20, left: 35 };
+        const chartWidth2 = width2 - margin2.left - margin2.right;
+        const chartHeight2 = height2 - margin2.top - margin2.bottom;
+        const chart2 = svg2.append('g').attr('transform', `translate(${margin2.left},${margin2.top})`);
+
+
+        const svg3 = d3.select("#chart3");
+
+        const width3 = svg3.attr("width");
+        const height3 = svg3.attr("height");
+        const margin3 = { top: 25, right: 70, bottom: 20, left: 25 };
+        const chartWidth3 = width3 - margin3.left - margin3.right;
+        const chartHeight3 = height3 - margin3.top - margin3.bottom;
+        const chart3 = svg3.append('g').attr('transform', `translate(${margin2.left},${margin2.top})`);
+
+        const getData = async function () {
+            //chart 1
+            const sourceData = await d3.csv("temp_country_year.csv", d3.autoType);
+
+            let countryData = sourceData.filter((item) => {
+                if (item['AverageTemperature'] != "undefined" && item['AverageTemperature'] != null && item['AverageTemperature'] != 'null' && item['AverageTemperature'] != ""
+                    && item['Country'] != "Africa" && item['Country'] != "Asia" && item['Country'] != "Oceania" && item['Country'] != "North America" && item['Country'] != "South America"
+                    && item['Country'] != "Europe") {
+                    return item;
+                }
+            });
+
+            const tempExtent = d3.extent(countryData, d => d['AverageTemperature']);
+            console.log("temp" + tempExtent);
+
+
+            const colorScale = d3.scaleQuantile()
+                .domain(tempExtent)
+                .range(["#08519c", "#3182bd", "#6baed6", "#bdd7e7", "#eff3ff", "#fee5d9", "#fcae91", "#fb6a4a", "#de2d26", "#a50f15"]);
+
+            drawLegend(d3.select("#colorLegend"), colorScale);
+
+            function drawLegend(legend, colorScale) {
+
+                const legendWidth = legend.attr("width");
+                const legendHeight = legend.attr("height");
+                const legendMinMax = d3.extent(colorScale.domain());
+                const barHeight = 60;
+                const stepSize = 4;
+
+                const pixelScale = d3.scaleLinear().domain([0, legendWidth - 40]).range([legendMinMax[0] - 1, legendMinMax[1] + 1]);
+                const barScale = d3.scaleLinear().domain([legendMinMax[0] - 1, legendMinMax[1] + 1]).range([0, legendWidth - 40]);
+                const barAxis = d3.axisBottom(barScale);
+
+                if (colorScale.hasOwnProperty('quantiles')) {
+                    barAxis.tickValues(colorScale.quantiles().concat(legendMinMax));
+                }
+
+                legend.append("g")
+                    .attr("class", "colorbar axis")
+                    .attr("transform", "translate(" + (20) + "," + (barHeight + 5) + ")")
+                    .call(barAxis);
+
+                let bar = legend.append("g").attr("transform", "translate(" + (20) + "," + (0) + ")");
+
+                for (let i = 0; i < legendWidth - 40; i = i + stepSize) {
+                    bar.append("rect")
+                        .attr("x", i)
+                        .attr("y", 0)
+                        .attr("width", stepSize)
+                        .attr("height", barHeight)
+                        .style("fill", colorScale(pixelScale(i)));
+                }
+
+                bar.append("line")
+                    .attr("stroke", "white")
+                    .attr("stroke-width", 3)
+                    .attr("x1", barScale(legendMinMax[0]))
+                    .attr("x2", barScale(legendMinMax[0]))
+                    .attr("y1", 0).attr("y1", barHeight + 4);
+
+                bar.append("line")
+                    .attr("stroke", "white")
+                    .attr("stroke-width", 3)
+                    .attr("x1", barScale(legendMinMax[1]))
+                    .attr("x2", barScale(legendMinMax[1]))
+                    .attr("y1", 0)
+                    .attr("y1", barHeight + 4);
+            }
+
+
+            const yearExtent = d3.extent(countryData, d => d['Year']);
+            console.log(yearExtent);
+
+            console.log(countryData);
+
+            const world = await d3.json("countries-50m.json");
+            console.log(world);
+
+            var filtered_countries = world.objects.countries.geometries;
+            filtered_countries = filtered_countries.filter(
+                d => d.properties.name !== "Antarctica" && d.properties.name !== "Greenland"
+            );
+            world.objects.countries.geometries = filtered_countries;
+
+            // 2b. Pick out topographic features and build d3 helpers
+            var countries = topojson.feature(world, world.objects.countries);     // List of state outlines to fill
+            var worldMesh = topojson.mesh(world, world.objects.countries);    // 'Mesh' of all outlines put together for a stroke
+            var projection = d3.geoMercator().fitSize([mapWidth, mapHeight], countries);
+            var path = d3.geoPath().projection(projection);
+            console.log(countries);
+            console.log(worldMesh);
+
+            let momesh = map.append("path")
+                .attr("class", "mouseover outline")
+                .attr("d", "");
+
+            // 2c. Draw states and outlines (see CSS at the top)
+            map.selectAll("path.country").data(countries.features.filter(d => d.properties.name !== "Antarctica"
+                && d.properties.name !== "Greenland"))
+                .join("path")
+                .attr("class", "country")
+                .attr("note", d => d.id)  // debugging
+                .attr("d", path)
+                .on('mouseover', mouseEntersPlot)
+                .on('mouseout', mouseLeavesPlot);
+
+            map.append("path").datum(worldMesh)
+                .attr("class", "outline")
+                .attr("d", path);
+
+            // Slider
+            var dataTime = d3.range(0, 10).map(function (d) {
+                return new Date(1743 + d * 30, 1, 1);
+            });
+
+            var slider = d3
+                .sliderBottom()
+                .min(d3.min(dataTime))
+                .max(new Date(2013, 12, 1))
+                .step(1000 * 60 * 60 * 24 * 365)
+                .width(660)
+                .tickFormat(d3.timeFormat('%Y'))
+                .tickValues(dataTime)
+                .default(new Date(2012, 1, 1))
+                .on('onchange', val => {
+                    let current_year = d3.timeFormat('%Y')(val);
+                    mapPainter(current_year);
+                    barPainter(current_year);
+                    linePainter(current_year);
+                    generateTList(current_year);
+                    d3.select('p#value-time').text(" Current Year: " + current_year);
+                });
+
+            map.append('g')
+                .attr('transform', `translate(${40},${30})`)
+                .call(slider);
+
+
+            d3.select('p#value-time')
+                .text(" Current Year: " + d3.timeFormat('%Y')(slider.value()));
+
+            //tooltip
+            const infoBox = map.append("g")
+                .attr("class", "infoBox")
+                .attr("transform", `translate(${0},${margin.top})`);
+
+            const rect = infoBox.append("rect").attr("class", "rect")
+                .attr("x", 0)
+                .attr("y", 50)
+                .attr("rx", 10)
+                .attr("ry", 10)  // rx and ry round corners
+                .attr("height", 55)
+                .attr("stroke", "#f7e48d")
+                .attr("stroke-width", "2px")
+                .attr("fill", "#fff4c2");
+
+            const tooltip = infoBox.append("g").attr("transform", "translate(0,10)");
+            const format = d3.format(',d');
+
+            function getLen(str) {
+                const temp = infoBox.append("text").attr("class", "text").attr("visibility", "hidden");
+                temp.text(str)
+                let length = temp.node().getComputedTextLength()
+                temp.remove()
+                return length;
+            }
+
+            var tList = {}
+            generateTList(2012);
+            function generateTList(current_year) {
+                let filterData = countryData.filter((item) => {
+                    if (item['Year'] == current_year) {
+                        return item;
+                    }
+                });
+                tList = {}
+                filterData.forEach((d, i) => {
+                    tList[d.Country] = d.AverageTemperature
+                })
+                console.log("tList:", tList)
+            }
+
+            function mouseEntersPlot() {
+                infoBox.attr("visibility", "");
+                map.selectAll(".country")
+                    .transition().duration(10)
+                    .style("opacity", 0.6);
+
+                let country = d3.select(this);
+
+                country.transition()
+                    .duration(10)
+                    .style("opacity", 1);
+
+                let countryID = country.datum().id;
+                console.log(country.datum())
+
+                let bounds = path.bounds(country.datum());
+
+                let xPos = (bounds[0][0] + bounds[1][0]) / 2.0;
+                let yPos = bounds[1][1] - 15;
+
+                var mo = topojson.mesh(world, world.objects.countries, function (a, b) { return a.id === countryID || b.id === countryID; });
+                momesh.datum(mo)
+                    .attr("d", path)
+
+                tooltip.html('');
+
+                let countryName = `Country: ${country.datum().properties.name}`;
+                let avgTemperature = `Average temperature: ${(Number(tList[country.datum().properties.name]).toFixed(2) + " celcius")}`;
+
+                if (tList[country.datum().properties.name] == null) {
+                    avgTemperature = `Average temperature: No statistics in current year`;
+                }
+
+                let maxLen = Math.max(getLen(countryName), getLen(avgTemperature));
+                console.log(maxLen)
+                rect.attr("width", maxLen + 10);
+
+                tooltip.append("text")
+                    .text(countryName)
+                    .attr("x", 10)
+                    .attr("y", 60)
+                    .attr("font-size", "15px")
+                    .attr("fill", "#211904");
+
+                tooltip.append("text")
+                    .text(avgTemperature)
+                    .attr("x", 10)
+                    .attr("y", 80)
+                    .attr("font-size", "15px")
+                    .attr("fill", "#211904");
+
+            }
+
+            function mouseMovesPlot() {
+
+            }
+
+            function mouseLeavesPlot() {
+                map.selectAll(".country")
+                    .transition().duration(10)
+                    .style("opacity", 1)
+
+                let country = d3.select(this);
+                momesh.attr("d", "");
+                infoBox.attr("visibility", "hidden");
+
+            }
+
+            mapPainter("2012");
+            //mapChart
+            function mapPainter(current_year) {
+                let currentMapData = countryData.filter((item) => {
+                    if (item['Year'] == current_year) {
+                        return item;
+                    }
+                });
+                let nameToTemp = {};
+                currentMapData.forEach((dd, i) => {
+                    nameToTemp[dd.Country] = dd.AverageTemperature
+                })
+                map.selectAll(".country")
+                    .attr("label", d => d['AverageTemperature'])
+                    .style("fill", d => colorScale(nameToTemp[d.properties.name]))
+                    .on("mouseover", mouseEntersPlot)
+                    .on("mousemove", mouseMovesPlot)
+                    .on("mouseleave", mouseLeavesPlot);
+            };
+
+            //chart2
+            const landData = await d3.csv("GlobalTemperature.csv", d3.autoType);
+            console.log(landData);
+            const xScale = d3.scaleBand().domain(["Land Avg Temp", "Land Max Temp", "Land Min Temp", "Land & Ocean Avg Temp"]).range([0, chartWidth2]);
+            const yScale21 = d3.scaleLinear().domain([0, 30]).range([chartHeight2 * 3 / 4, 0]);
+            const yScale22 = d3.scaleLinear().domain([-10, 0]).range([chartHeight2, chartHeight2 * 3 / 4]);
+
+
+            let bottomAxis2 = d3.axisBottom(xScale).ticks(3);
+            svg2.append("g")
+                .attr("class", "x axis")
+                .attr('transform', `translate(${margin2.left + 10},${chartHeight2 + margin2.top})`)
+                .call(bottomAxis2);
+
+            let leftAxis21 = d3.axisLeft(yScale21).ticks(6).tickFormat(d => d);
+            svg2.append("g")
+                .attr("class", "y axis")
+                .attr('transform', `translate(${margin2.left},${margin2.top})`)
+                .call(leftAxis21);
+
+            let leftAxis22 = d3.axisLeft(yScale22).ticks(2).tickFormat(d => d);
+            svg2.append("g")
+                .attr("class", "y axis")
+                .attr('transform', `translate(${margin2.left},${margin2.top})`)
+                .call(leftAxis22);
+
+            let leftGridlines21 = d3.axisLeft(yScale21).ticks(6).tickFormat("").tickSize(-chartWidth2 - 10);
+            svg2.append("g")
+                .attr("class", "y gridlines")
+                .attr('transform', `translate(${margin2.left + 5},${margin2.top})`)
+                .call(leftGridlines21);
+
+            let leftGridlines22 = d3.axisLeft(yScale22).ticks(2).tickFormat("").tickSize(-chartWidth2 - 10);
+            svg2.append("g")
+                .attr("class", "y gridlines")
+                .attr('transform', `translate(${margin2.left + 5},${margin2.top})`)
+                .call(leftGridlines22);
+            chart2.raise();
+
+            svg2.append("text").attr("x", 0).attr("y", 8).text("Temperature (celcius)")
+                .style("font-size", "10px").style("font-weight", "600").attr("alignment-baseline", "middle")
+                .attr("fill", "black");
+
+            barPainter("2012");
+            function barPainter(current_year) {
+                svg2.selectAll("rect").remove()
+                chart2.select("#text1").remove();
+                chart2.select("#text2").remove();
+                chart2.select("#text3").remove();
+                chart2.select("#text4").remove();
+
+                let currentBarData = landData.filter((item) => {
+                    if (item['Year'] == current_year) {
+                        console.log(item['LandAverageTemperature']);
+                        return item;
+                    }
+                });
+                console.log(currentBarData);
+
+                let rect1 = chart2.append("rect")
+                    .data(currentBarData)
+                    .attr('fill', d => colorScale(d['LandAverageTemperature']))
+                    .attr("x", chartWidth2 / 5 - 46)
+                    .attr("y", function (d) {
+                        if (d['LandAverageTemperature'] > 0)
+                            return yScale21(d['LandAverageTemperature'])
+                        else if (d['LandAverageTemperature'] == null || d['LandAverageTemperature'] == "" || d['LandAverageTemperature'] == undefined) {
+                            return 0
+                        }
+                        else
+                            return yScale22(0)
+                    })
+                    .attr("height", function (d) {
+                        if (d['LandAverageTemperature'] > 0)
+                            return (chartHeight2 * 3 / 4 - yScale21(d['LandAverageTemperature']))
+                        else if (d['LandAverageTemperature'] == null || d['LandAverageTemperature'] == "" || d['LandAverageTemperature'] == undefined) {
+                            return 0
+                        }
+                        else
+                            return yScale22(d['LandAverageTemperature']) - chartHeight2 * 3 / 4
+                    })
+                    .attr("width", 50)
+                    .attr("opacity", 1);
+
+                rect1.on("mouseover", function () {
+                    d3.select(this)
+                        .transition()
+                        .duration(200)
+                        .attr("stroke", "lightgray")
+                        .attr("stroke-width", 2);
+                    chart2.append("text")
+                        .attr("id", "text1")
+                        .attr("x", chartWidth2 / 5 - 25)
+                        .attr("y", 120)
+                        .text(Number(currentBarData[0]['LandAverageTemperature']).toFixed(2))
+                        .style("font-size", "12px")
+                        .style("font-weight", "600")
+                        .attr("alignment-baseline", "middle")
+                        .attr("text-anchor", "middle")
+                        .attr("fill", "gray");
+                });
+
+                rect1.on("mouseout", function () {
+                    d3.select(this)
+                        .transition()
+                        .duration(200)
+                        .attr("stroke-width", 0);
+                    chart2.select("#text1").remove();
+                });
+
+
+                let rect2 = chart2.append("rect")
+                    .data(currentBarData)
+                    .attr('fill', d => colorScale(d['LandMaxTemperature']))
+                    .attr("x", chartWidth2 * 2 / 5 - 25)
+                    .attr("y", function (d) {
+                        if (d['LandMaxTemperature'] > 0)
+                            return yScale21(d['LandMaxTemperature'])
+                        else if (d['LandMaxTemperature'] == null || d['LandMaxTemperature'] == "" || d['LandMaxTemperature'] == undefined) {
+                            return 0
+                        }
+                        else
+                            return yScale22(0)
+                    })
+                    .attr("height", function (d) {
+                        if (d['LandMaxTemperature'] > 0)
+                            return (chartHeight2 * 3 / 4 - yScale21(d['LandMaxTemperature']))
+                        else if (d['LandMaxTemperature'] == null || d['LandMaxTemperature'] == "" || d['LandMaxTemperature'] == undefined) {
+                            return 0
+                        }
+                        else
+                            return yScale22(d['LandMaxTemperature']) - chartHeight2 * 3 / 4
+                    })
+                    .attr("width", 50)
+                    .attr("opacity", 1);
+
+                rect2.on("mouseover", function () {
+                    d3.select(this)
+                        .transition()
+                        .duration(200)
+                        .attr("stroke", "lightgray")
+                        .attr("stroke-width", 2);
+                    chart2.append("text")
+                        .attr("id", "text2")
+                        .attr("x", chartWidth2 * 2 / 5 - 3)
+                        .attr("y", 50)
+                        .text(Number(currentBarData[0]['LandMaxTemperature']).toFixed(2))
+                        .style("font-size", "12px")
+                        .style("font-weight", "600")
+                        .attr("alignment-baseline", "middle")
+                        .attr("text-anchor", "middle")
+                        .attr("fill", "gray");
+                });
+
+                rect2.on("mouseout", function () {
+                    d3.select(this)
+                        .transition()
+                        .duration(200)
+                        .attr("stroke-width", 0);
+                    chart2.select("#text2").remove();
+                });
+
+                let rect3 = chart2.append("rect")
+                    .data(currentBarData)
+                    .attr('fill', d => colorScale(d['LandMinTemperature']))
+                    .attr("x", chartWidth2 * 3 / 5)
+                    .attr("y", function (d) {
+                        if (d['LandMinTemperature'] > 0)
+                            return yScale21(d['LandMinTemperature'])
+                        else if (d['LandMinTemperature'] == null || d['LandMinTemperature'] == "" || d['LandMinTemperature'] == undefined) {
+                            return 0
+                        }
+                        else
+                            return yScale22(0)
+                    })
+                    .attr("height", function (d) {
+                        if (d['LandMinTemperature'] > 0)
+                            return (chartHeight2 * 3 / 4 - yScale21(d['LandMinTemperature']))
+                        else if (d['LandMinTemperature'] == null || d['LandMinTemperature'] == "" || d['LandMinTemperature'] == undefined) {
+                            return 0
+                        }
+                        else
+                            return yScale22(d['LandMinTemperature']) - chartHeight2 * 3 / 4
+                    })
+                    .attr("width", 50)
+                    .attr("opacity", 1);
+
+                rect3.on("mouseover", function () {
+                    d3.select(this)
+                        .transition()
+                        .duration(200)
+                        .attr("stroke", "lightgray")
+                        .attr("stroke-width", 2);
+                    chart2.append("text")
+                        .attr("id", "text3")
+                        .attr("x", chartWidth2 * 3 / 5 + 25)
+                        .attr("y", 190)
+                        .text(Number(currentBarData[0]['LandMinTemperature']).toFixed(2))
+                        .style("font-size", "12px")
+                        .style("font-weight", "600")
+                        .attr("alignment-baseline", "middle")
+                        .attr("text-anchor", "middle")
+                        .attr("fill", "gray");
+                });
+
+                rect3.on("mouseout", function () {
+                    d3.select(this)
+                        .transition()
+                        .duration(200)
+                        .attr("stroke-width", 0);
+                    chart2.select("#text3").remove();
+                });
+
+                let rect4 = chart2.append("rect")
+                    .data(currentBarData)
+                    .attr('fill', d => colorScale(d['LandAndOceanAverageTemperature']))
+                    .attr("x", chartWidth2 * 4 / 5)
+                    .attr("y", function (d) {
+                        if (d['LandAndOceanAverageTemperature'] > 0)
+                            return yScale21(d['LandAndOceanAverageTemperature'])
+                        else if (d['LandAndOceanAverageTemperature'] == null || d['LandAndOceanAverageTemperature'] == "" || d['LandAndOceanAverageTemperature'] == undefined) {
+                            return 0
+                        }
+                        else
+                            return yScale22(0)
+                    })
+                    .attr("height", function (d) {
+                        if (d['LandAndOceanAverageTemperature'] > 0)
+                            return (chartHeight2 * 3 / 4 - yScale21(d['LandAndOceanAverageTemperature']))
+                        else if (d['LandAndOceanAverageTemperature'] == null || d['LandAndOceanAverageTemperature'] == "" || d['LandAndOceanAverageTemperature'] == undefined) {
+                            return 0
+                        }
+                        else
+                            return yScale22(d['LandAndOceanAverageTemperature']) - chartHeight2 * 3 / 4
+                    })
+                    .attr("width", 50)
+                    .attr("opacity", 1);
+
+                rect4.on("mouseover", function () {
+                    d3.select(this)
+                        .transition()
+                        .duration(200)
+                        .attr("stroke", "lightgray")
+                        .attr("stroke-width", 2);
+                    chart2.append("text")
+                        .attr("id", "text4")
+                        .attr("x", chartWidth2 * 4 / 5 + 25)
+                        .attr("y", 80)
+                        .text(Number(currentBarData[0]['LandAndOceanAverageTemperature']).toFixed(2))
+                        .style("font-size", "12px")
+                        .style("font-weight", "600")
+                        .attr("alignment-baseline", "middle")
+                        .attr("text-anchor", "middle")
+                        .attr("fill", "gray");
+                });
+
+                rect4.on("mouseout", function () {
+                    d3.select(this)
+                        .transition()
+                        .duration(200)
+                        .attr("stroke-width", 0);
+                    chart2.select("#text4").remove();
+                });
+            };
+
+
+            //chart3
+            var monthScale = d3.scaleTime().domain([new Date("Mon Dec 31 2012 19:00:00 GMT-0500 (EST)"), new Date("Mon Dec 31 2013 19:00:00 GMT-0500 (EST)")]).range([0, chartWidth3]);
+            let bottomAxis3 = d3.axisBottom(monthScale).ticks(d3.timeMonth).tickFormat(d3.timeFormat("%b"));
+            const MonthData = await d3.csv("Year_Month_Country.csv", d3.autoType);
+            console.log(MonthData);
+
+            const timeParser = d3.timeParse('%m-%d-%Y');
+            const tScale1 = d3.scaleLinear().domain([0, 40]).range([chartHeight3 * 1 / 2, 0]);
+            const tScale2 = d3.scaleLinear().domain([-40, 0]).range([chartHeight3, chartHeight3 * 1 / 2]);
+
+            let leftAxis31 = d3.axisLeft(tScale1).ticks(4).tickFormat(d => d);
+            svg3.append("g")
+                .attr("class", "y axis")
+                .attr('transform', `translate(${margin3.left},${margin3.top})`)
+                .call(leftAxis31);
+
+            let leftAxis32 = d3.axisLeft(tScale2).ticks(4).tickFormat(d => d);
+            svg3.append("g")
+                .attr("class", "y axis")
+                .attr('transform', `translate(${margin3.left},${margin3.top})`)
+                .call(leftAxis32);
+
+            let leftGridlines31 = d3.axisLeft(tScale1).ticks(4).tickFormat("").tickSize(-chartWidth3 - 10);
+            svg3.append("g")
+                .attr("class", "y gridlines")
+                .attr('transform', `translate(${margin3.left + 5},${margin3.top})`)
+                .call(leftGridlines31);
+
+            let leftGridlines32 = d3.axisLeft(tScale2).ticks(4).tickFormat("").tickSize(-chartWidth3 - 10);
+            svg3.append("g")
+                .attr("class", "y gridlines")
+                .attr('transform', `translate(${margin3.left + 5},${margin3.top})`)
+                .call(leftGridlines32);
+
+            chart3.raise();
+
+            const timeFormater = d3.timeFormat("%y-%m-%d")
+
+            MonthData.forEach(d => {
+                d['date'] = timeFormater(d["dt"]);
+            });
+
+            svg3.append('line').style("stroke", "lightgrey").style("stroke-width", 1.5).attr("x1", 24.2).attr("y1", 9).attr("x2", 24.2).attr("y2", 281);
+
+            svg3.append("g")
+                .attr("class", "x axis")
+                .attr('transform', `translate(${margin3.left + 5},${chartHeight3 + margin3.top})`)
+                .call(bottomAxis3);
+
+            console.log("MonthData", MonthData)
+
+            svg3.append("text").attr("x", 0).attr("y", 7).text("Temperature (celcius)")
+                .style("font-size", "10px").style("font-weight", "600").attr("alignment-baseline", "middle")
+                .attr("fill", "black");
+            svg3.append("text").attr("x", 480).attr("y", 290).text("Month")
+                .style("font-size", "10px").style("font-weight", "600").attr("alignment-baseline", "middle")
+                .attr("fill", "black");
+
+            var option = "Argentina"
+
+            linePainter("2012")
+
+            function linePainter(current_year) {
+                svg3.selectAll("path").remove();
+                svg3.selectAll("circle").remove();
+
+                console.log("Mon Dec 31 " + (current_year - 1).toString() + " 19:00:00 GMT-0500 (EST)");
+
+                monthScale = d3.scaleTime().domain([new Date("Jan 1 " + (current_year).toString() + " 19:00:00 GMT-0500 (EST)"), new Date("Dec 31 " + (current_year).toString() + " 19:00:00 GMT-0500 (EST)")]).range([0, chartWidth3]);
+                bottomAxis3 = d3.axisBottom(monthScale).ticks(d3.timeMonth).tickFormat(d3.timeFormat("%b"));
+
+                let curData = MonthData.filter((item) => {
+                    if (item['dt'].getFullYear() == current_year && item['Country'] == option) {
+                        return item;
+                    }
+                });
+
+                let lineGen = d3.line()
+                    .x(d => monthScale(d['dt']) - 41)
+                    .y(function (d) {
+                        if (d['AverageTemperature'] == null || d['AverageTemperature'] == "" || d['AverageTemperature'] == undefined)
+                            console.log("No data")
+                        else if (d['AverageTemperature'] > 0)
+                            return tScale1(d['AverageTemperature'])
+                        else
+                            return Math.abs(tScale2(d['AverageTemperature']))
+                    })
+                    .curve(d3.curveMonotoneX);
+
+
+                chart3.append("path")
+                    .datum(curData)
+                    .attr("class", "line")
+                    .attr("fill", "none")
+                    .attr("stroke", "black")
+                    .attr("stroke-width", 3)
+                    .attr("d", lineGen);
+
+
+                chart3.selectAll("circle")
+                    .data(curData)
+                    .join("circle")
+                    .attr("r", 5)
+                    .attr("opacity", function (d) {
+                        if (d['AverageTemperature'] == null || d['AverageTemperature'] == "" || d['AverageTemperature'] == undefined)
+                            return 0;
+                        else
+                            return 1;
+                    })
+                    .attr("cx", d => monthScale(d['dt']) - 41)
+                    .attr("cy", function (d) {
+                        if (d['AverageTemperature'] == null || d['AverageTemperature'] == "" || d['AverageTemperature'] == undefined)
+                            console.log("No data")
+                        else if (d['AverageTemperature'] > 0)
+                            return tScale1(d['AverageTemperature'])
+                        else
+                            return Math.abs(tScale2(d['AverageTemperature']))
+                    })
+                    .style("fill", d => colorScale(d['AverageTemperature']))
+                    .attr("stroke", "black");
+
+                d3.select("#sort-select").on("change", function () {
+                    svg3.selectAll("path").remove();
+                    svg3.selectAll("circle").remove();
+
+                    option = d3.select(this).property("value")
+
+                    curData = MonthData.filter((item) => {
+                        if (item['dt'].getFullYear() == current_year && item['Country'] == option) {
+                            return item;
+                        }
+                    });
+
+                    lineGen = d3.line()
+                        .x(d => monthScale(d['dt']) - 41)
+                        .y(function (d) {
+                            if (d['AverageTemperature'] == null || d['AverageTemperature'] == "" || d['AverageTemperature'] == undefined)
+                                console.log("No data")
+                            else if (d['AverageTemperature'] > 0)
+                                return tScale1(d['AverageTemperature'])
+                            else
+                                return Math.abs(tScale2(d['AverageTemperature']))
+                        })
+                        .curve(d3.curveMonotoneX);
+
+
+                    chart3.append("path")
+                        .datum(curData)
+                        .attr("class", "line")
+                        .attr("fill", "none")
+                        .attr("stroke", "black")
+                        .attr("stroke-width", 3)
+                        .attr("d", lineGen);
+
+
+                    chart3.selectAll("circle")
+                        .data(curData)
+                        .join("circle")
+                        .attr("r", 5)
+                        .attr("opacity", function (d) {
+                            if (d['AverageTemperature'] == null || d['AverageTemperature'] == "" || d['AverageTemperature'] == undefined)
+                                return 0;
+                            else
+                                return 1;
+                        })
+                        .attr("cx", d => monthScale(d['dt']) - 41)
+                        .attr("cy", function (d) {
+                            if (d['AverageTemperature'] == null || d['AverageTemperature'] == "" || d['AverageTemperature'] == undefined)
+                                console.log("No data")
+                            else if (d['AverageTemperature'] > 0)
+                                return tScale1(d['AverageTemperature'])
+                            else
+                                return Math.abs(tScale2(d['AverageTemperature']))
+                        })
+                        .style("fill", d => colorScale(d['AverageTemperature']))
+                        .attr("stroke", "black");
+
+                    console.log(curData)
+                });
+
+            }
+        };
+
+        getData();
+    </script>
+    <style>
+        .outline {
+            stroke: lightgray;
+            stroke-width: 1px;
+            fill: none;
+        }
+
+        .gridlines line {
+            stroke: #bbb;
+        }
+
+        .gridlines .domain {
+            stroke: none;
+        }
+
+        .axis .domain {
+            stroke: #bbb;
+        }
+
+        p.describe1 {
+            background-color: #fff4c2;
+            padding: 15px 50px;
+            font-size: 18px;
+            color:#211904;
+            font-family:Georgia, 'Times New Roman', Times, serif;
+            width:45%;
+            float:left;
+            margin-top:5%;
+        }
+
+        p.describe2 {
+            background-color: #fff4c2;
+            padding: 15px 50px;
+            font-size: 18px;
+            color:#211904;
+            font-family:Georgia, 'Times New Roman', Times, serif;
+            width:40%;
+            float:right;
+            margin-top:-7%;
+        }
+    </style>
+</body>
+
+</html>
